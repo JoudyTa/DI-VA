@@ -23,11 +23,12 @@ class UserFollow extends Model implements
     protected $casts = [
         'following_id' => 'array',
         'followers_id' => 'array',
-
+        'blocking_id' => 'array'
     ];
     protected $fillable = [
         'user_id',
         'following_id',
         'followers_id',
+        'blocking_id'
     ];
 }

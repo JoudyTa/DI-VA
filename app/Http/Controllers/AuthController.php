@@ -4,12 +4,22 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
-use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Mail;
 use App\Traits\TraitPhoto;
+use App\Models\User;
 use App\Models\UserFollow;
 use App\Models\Post;
+use App\Models\UserInterestId;
+use App\Models\ResetPassword;
+use App\Models\Story;
+use App\Mail\Reset;
+
+use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\SMTP;
+use PHPMailer\PHPMailer\Exception;
 
 class AuthController extends Controller
 {
@@ -44,6 +54,7 @@ class AuthController extends Controller
 
         return response($response, 201);
     }
+
     public function mtn(Request $request)
     {
         $user = User::find($request->id);
@@ -51,12 +62,14 @@ class AuthController extends Controller
         $user->save();
         return response()->json('Thanks for your trust.'); //for MTN
     }
+
     public function checkcode(Request $request)
     {
         $user = User::find(auth()->id());
         if ($user->code == $request->code)
             return true;
     }
+
     public function promotion(Request $request)
     {
         if ($this->checkcode($request)) {
@@ -79,6 +92,7 @@ class AuthController extends Controller
         $user->save();
         return response()->json('Your photo has been added');
     }
+
     public function uploadImage(Request $request)
     {
 
@@ -88,6 +102,7 @@ class AuthController extends Controller
         $user->update();
         return response()->json('Your photo has been uploaded ');
     }
+
     public function changePassword(Request $request)
     {
 
@@ -103,6 +118,7 @@ class AuthController extends Controller
             return response()->json('Your passowrd has been changed.');
         }
     }
+
     public function update(Request $request)
     {
 
@@ -140,7 +156,8 @@ class AuthController extends Controller
 
         return response($response, 201);
     }
-    public function makefollowpage()
+
+    public function makefollowpage(Request $request)
     {
         $user = UserFollow::create([
             'user_id' => auth()->id(),
@@ -149,21 +166,39 @@ class AuthController extends Controller
 
         ]);
 
+        for ($i = 0; $i < count($request->interest_id); $i++) {
+            if ($request->interest_id[$i] === "{" || $request->interest_id[$i] === "}" || $request->interest_id[$i] === ",")
+                continue;
+            UserInterestId::create([
+                'interest_id' => $request->interest_id[$i],
+                'user_id' => Auth::id()
+            ]);
+        }
+
         return response()->json('Welcome in Di-Va');
     }
+
     public  function myprofile($id)
     {
 
         $following_id = (new UserFollowController)->following($id);
         $followers_id = (new UserFollowController)->follower($id);
+        $story = Story::Where('user_id', auth()->id());
+        $data['My Info']['Personal'] = User::find($id);
+        if ($followers_id === null)
+            $data['My Info']['Followers'] = "No followers yet!";
+        else
+            $data['My Info']['Followers'] = count($followers_id) - 1;
 
-        $data['My Inf']['Personal'] = User::find($id);
-        $data['My Info']['Followers'] = count($followers_id) - 1;
-        $data['My Info']['Following'] = count($following_id) - 1;
+        if ($following_id === null)
+            $data['My Info']['Following'] = "No follwing yet!";
+        else
+            $data['My Info']['Following'] = count($following_id) - 1;
         $data['My Posts'] = $this->myposts($id);
-
+        $data['My Info']['Stores'] = $story;
         return response()->json($data);
     }
+
     public function myposts($id)
     {
         $posts = Post::orderBy('is_prometed', 'created_at')->get();
@@ -180,16 +215,89 @@ class AuthController extends Controller
         else
             return response()->json($myposts);
     }
+
     public function logout()
     {
-
         return [
             'message' => 'Logged out'
         ];
     }
-    public function destroy()
+
+    public function destroy(Request $request)
     {
-        User::find(auth()->id())->delete();
-        return response()->json('Di-Va is sorry to lose you , hopes you enjoyed ');
+        $user = User::find(auth()->id());
+        if (!Hash::check($request->old_password, $user->password)) {
+            return response()->json('Your passowrd is not match.');
+        } else {
+            $user->delete();
+            return response()->json('Di-Va is sorry to lose you , hopes you enjoyed ');
+        }
+    }
+
+    public function checkemail(Request $request)
+    {
+        $request->validate([
+            'email' => 'required|email'
+        ]);
+        $em = ResetPassword::Where('email', $request->email)->first();
+        if (!$em) {
+            $email = User::where('email', $request->email)->first();
+
+            if ($email) {
+                $code = \random_int(10000, 99999);
+                Mail::to($request->email)->send(new Reset($code));
+
+                $reset = ResetPassword::create([
+                    'email' => $email->email,
+                    'code' => $code
+                ]);
+
+                return "We send code to your Email, check it !";
+            } else {
+                return "Your email is uncorrect";
+            }
+        } else {
+            $code = \random_int(10000, 99999);
+            Mail::to($request->email)->send(new Reset($code));
+            $em->code = $code;
+            $em->save();
+            return "Code has been sent back to your email , check it back";
+        }
+    }
+
+    public function chkcode(Request $request)
+    {
+        $request->validate([
+            'code' => 'required'
+        ]);
+
+        $code = $request->input('code');
+        $email = $request->input('email');
+
+        $user = ResetPassword::where('code', $code)->first();
+
+        if ($user->email === $email) {
+            ResetPassword::destroy($user->id);
+            return response()->json('Code is correct , you can change password');
+        } else {
+            return response()->json('Code is uncorrect');
+        }
+    }
+
+    public function resetpassword(Request $request)
+    {
+
+        $request->validate([
+            'newpassword' => 'required|string|confirmed'
+        ]);
+
+        $email = $request->input('email');
+        $user = User::where('email', $email)->first();
+
+        $user->update([
+            'password' => bcrypt($request->input('newpassword'))
+        ]);
+
+        return response()->json('Your password has been changed');
     }
 }

@@ -16,6 +16,8 @@ class CreateStoriesTable extends Migration
         Schema::create('stories', function (Blueprint $table) {
             $table->id();
             $table->string('photo');
+            $table->string('user_name');
+            $table->string('user_photo');
             $table->ForeignId('user_id')->constrained('users')->cascadeOnDelete();
             $table->timestamps();
         });

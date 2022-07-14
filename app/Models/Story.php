@@ -13,6 +13,8 @@ class Story extends Model
     protected $connection = 'mysql';
     protected $fillable = [
         'photo',
-        'user_id'
+        'user_id',
+        'user_name',
+        'user_photo'
     ];
 }

@@ -19,6 +19,7 @@ class CreateUserFollowsTable extends Migration
             $table->id('user_id');
             $table->array('following_id');
             $table->array('followers_id');
+            $table->array('blocking_id');
             $table->timestamps();
         });
     }

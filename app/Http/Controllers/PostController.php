@@ -43,7 +43,6 @@ class PostController extends Controller
     public function show($id)
     {
         $post = Post::find($id);
-
         return $post;
     }
 
@@ -70,12 +69,23 @@ class PostController extends Controller
             else
                 return response()->json('You no longer have permission to promote, your number of posts has expired .');
         }
+        $interest_id[] = [];
+        $j = 0;
+        for ($i = 0; $i < Str::length($request->interest_id); $i++) {
+            if ($request->interest_id[$i] === "," || $request->interest_id[$i] === "[" || $request->interest_id[$i] === "]")
+                continue;
+            $interest_id[$j] = $request->interest_id[$i];
+            $j++;
+        }
+
         $post = Post::create([
 
             'photo' => $file_name,
             'user_id' => $user,
-            'interest_id' => $request->interest_id,
+            'interest_id' => $interest_id,
+
         ]);
+
         if ($request->has("content")) {
             $post->content = $request->content;
             $post->save();
@@ -93,7 +103,7 @@ class PostController extends Controller
     /**
      * Display the specified resource.
      *
-     * @param  \App\Models\Post  $post
+     * @param \App\Models\Post $post
      * @return \Illuminate\Http\Response
      */
 
@@ -112,6 +122,7 @@ class PostController extends Controller
             }
         }
 
+
         $user = auth()->id();
         $allinterested = UserInterestId::all()->where('user_id', $user); //gives you all user's interested
         $following_id = (new UserFollowController)->following($user);
@@ -123,19 +134,15 @@ class PostController extends Controller
         $getpost2[] = null; //following
         $getinterest[] = null;
         for ($i = 0; $i < count($post); $i++) {
-
-
             $tw = $post[$i]['interest_id'];
             $r = 0;
-            for ($l = 0; $l < Str::length($tw); $l++) {
 
-                if ($tw[$l] === "[" || $tw[$l] === "]" || $tw[$l] === "," || $tw[$l] === null)
-                    continue;
+            for ($l = 0; $l < Str::length($tw); $l++) {
+                if ($tw[$l] === "[" || $tw[$l] === "]" || $tw[$l] === "," || $tw[$l] === null) continue;
                 else {
                     $getinterest[$r] = $tw[$l];
                     for ($j = 0; $j < count($allinterested); $j++) {
-
-                        if ($getinterest[$r] == $allinterested[$j]->interest_id) {
+                        if ($getinterest[$r] === $allinterested[$j]->interest_id) {
 
                             $getpost1[$i] = $post[$i];
                         }
@@ -143,15 +150,16 @@ class PostController extends Controller
                 }
             }
             for ($k = 0; $k < count($following_id); $k++) {
-                if ($post[$i]['user_id'] == $following_id[$k]) {
+                if ($post[$i]['user_id'] === $following_id[$k]) {
                 }
             }
         }
         for ($k = 1; $k < count($following_id); $k++) {
             $getpost2[$k] = (new AuthController)->myposts($following_id[$k]);
         }
-
-        return $getpost2;
+        $home['Posts'] = $getpost1 and $getpost1;
+        $home['Stories'] = Story::all();
+        return $home;
     }
 
     public function update(Request $request, $id)
@@ -189,7 +197,7 @@ class PostController extends Controller
     /**
      * Remove the specified resource from storage.
      *
-     * @param  \App\Models\Post  $post
+     * @param \App\Models\Post $post
      * @return \Illuminate\Http\Response
      */
     public function destroy($id)

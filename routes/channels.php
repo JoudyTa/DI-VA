@@ -17,8 +17,11 @@ Broadcast::channel('App.Models.User.{id}', function ($user, $id) {
     return (int) $user->id === (int) $id;
 });
 
+$id = auth()->id();
 
+Broadcast::channel('App.Models.User' . $id . 'Post', function ($user) {
+    return in_array(auth()->id(), $user->followers_id);
+});
 
-Broadcast::channel('post.{id}', function ($user, $id) {
-    return $user->id == \App\Models\Post::find($id)->user_id;
+Broadcast::channel('Post.{id}', function ($user) {
 });
