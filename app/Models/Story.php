@@ -15,6 +15,13 @@ class Story extends Model
         'photo',
         'user_id',
         'user_name',
-        'user_photo'
+        'user_photo',
+        'date_type'
     ];
+
+    public function users()
+    {
+
+        return $this->belongsTo('App\Models\User');
+    }
 }

@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\Story;
 use App\Models\User;
-use Auth;
 
 class StoryController extends Controller
 {
@@ -21,15 +20,16 @@ class StoryController extends Controller
             $filename = $photo->getClientOriginalName();
             $extension = pathinfo($filename, PATHINFO_EXTENSION);
 
-            if ($extension == 'mp4') {
+            $user = User::find(auth()->id());
+            if ($extension === 'mp4') {
                 $path = public_path() . '/images/Story/videos/';
                 $photo->move($path, $filename);
-                $user = User::find(auth()->id());
                 $story = Story::create([
                     'photo' => $filename,
                     'user_id' => auth()->id(),
                     'user_name' => $user->name,
-                    'user_photo' => $user->photo
+                    'user_photo' => $user->photo,
+                    'date_type' => $request->date_type
 
                 ]);
                 return response()->json($extension);
@@ -39,9 +39,12 @@ class StoryController extends Controller
 
                 $story = Story::create([
                     'photo' => $filename,
-                    'user_id' => auth()->id()
+                    'user_id' => auth()->id(),
+                    'user_name' => $user->name,
+                    'user_photo' => $user->photo,
+                    'date_type' => $request->date_type
                 ]);
-                return response()->json($extension);
+                return response()->json('Your story has been published');
             }
         }
     }
@@ -51,16 +54,16 @@ class StoryController extends Controller
         $photo = Story::find($id)->photo;
         $ext =  pathinfo($photo, PATHINFO_EXTENSION);
 
-        if ($ext == 'mp4') {
+        if ($ext === 'mp4') {
             unlink(public_path('/images/Story/videos/' . $photo));
             Story::destroy($id);
-            return response()->json('story deleted');
+            return response()->json('Story deleted');
         }
         //
         else {
             unlink(public_path('/images/Story/images/' . $photo));
             Story::destroy($id);
-            return response()->json('story deleted');
+            return response()->json('Story deleted');
         }
     }
 }

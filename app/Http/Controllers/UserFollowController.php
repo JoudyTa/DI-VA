@@ -5,10 +5,13 @@ namespace App\Http\Controllers;
 use App\Models\UserFollow;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use App\Models\User;
+use App\Notifications\FollowNotification;
+use App\Traits\TraitNotify;
 
 class UserFollowController extends Controller
 {
-
+    use TraitNotify;
     public function getuser($id)
     {
         $users = UserFollow::all();
@@ -24,7 +27,9 @@ class UserFollowController extends Controller
     {
 
         $user = $this->getUser($id);
-
+        if ($user === null) {
+            return [];
+        }
         return $user->followers_id;
     }
 
@@ -33,7 +38,9 @@ class UserFollowController extends Controller
     {
 
         $user = $this->getUser($id);
-
+        if ($user === null) {
+            return [];
+        }
         return $user->following_id;
     }
 
@@ -48,9 +55,9 @@ class UserFollowController extends Controller
         $followers_id = $you->followers_id;
 
         if ($following_id === null)
-            $following_id = [0];
+            $following_id = [];
         if ($followers_id === null)
-            $followers_id = [0];
+            $followers_id = [];
 
         if (in_array($user, $followers_id)) {
 
@@ -68,6 +75,8 @@ class UserFollowController extends Controller
 
             $me->update();
             $you->update();
+            $user_name = User::find($id)->name;
+            return response()->json("You unfollowed {$user_name}");
         } else {
 
             array_push($followers_id, $user);
@@ -81,6 +90,17 @@ class UserFollowController extends Controller
 
             $me->update();
             $you->update();
+            $user_name = User::find($id)->name;
+
+
+            $user_not = User::find($id);
+            $this->Notifications($user_not->FCM, "Started following you .!", null, null);
+
+            //For Notifications API
+            $user_noty = User::find($id);
+            $user_noty->notify(new FollowNotification());
+
+            return response()->json("You follow {$user_name}");
         }
     }
 
@@ -89,24 +109,46 @@ class UserFollowController extends Controller
         $me_id = Auth::id();
         $me = $this->getuser($me_id);
         $blocking_id = $me->blocking_id;
-
+        $user_name =   User::find($id)->name;
         if ($blocking_id == null)
             $blocking_id = [];
 
         if (in_array($id, $blocking_id)) {
             $index = array_search($id, $blocking_id);
             unset($blocking_id[$index]);
+
             $blocking_id = array_merge($blocking_id);
             $me->blocking_id = $blocking_id;
             $me->update();
 
-            return response()->json("you unblocked this user", 200);
+            return response()->json("You unblocked {$user_name} ");
         } else {
+            $following_ids = $me->following_id;
+            if ($following_ids != null)
+                if (in_array($id, $following_ids)) {
+
+                    $index_user = array_search($id, $following_ids);
+                    unset($following_ids[$index_user]);
+                    $following_ids = array_merge($following_ids);
+
+                    $me->following_id = $following_ids;
+                    $me->update();
+
+
+                    $you = $this->getuser($id);
+                    $followers_id = $you->followers_id;
+                    $index_user = array_search($me_id, $followers_id);
+                    unset($followers_id[$index_user]);
+                    $followers_id = array_merge($followers_id);
+                    $you->followers_id = $followers_id;
+                    $you->update();
+                }
+
             array_push($blocking_id, $id);
             $me->blocking_id = $blocking_id;
             $me->update();
 
-            return response()->json("you blocked this user", 200);
+            return response()->json("You blocked {$user_name}");
         }
     }
 }

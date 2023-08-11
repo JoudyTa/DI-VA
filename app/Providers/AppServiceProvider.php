@@ -13,8 +13,14 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register()
     {
-        //
+
+        //else register your services you require for production
+        // $this->app['request']->server->set('HTTPS', true);
+        if ($this->app->environment() != 'local') {
+            $this->app['request']->server->set('HTTPS', true);
+        }
     }
+
 
     /**
      * Bootstrap any application services.
@@ -23,6 +29,5 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot()
     {
-        //
     }
 }

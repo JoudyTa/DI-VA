@@ -23,7 +23,7 @@ class CreatePostsTable extends Migration
             $table->array('upvotes_user_id')->defaultValue(0);
             $table->array('downvotes_user_id')->defaultValue(0);
             $table->array('interest_id');
-            $table->array('comments')->nullable();
+            $table->array('comments')->nullable()->change();
             $table->Boolean('is_prometed')->default(false);
             $table->timestamps();
         });

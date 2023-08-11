@@ -30,6 +30,8 @@ class User extends Authenticatable
         'code',
         'is_promtion',
         'number_of_posts',
+        'FCM',
+        'pay'
     ];
 
     /**
@@ -50,4 +52,12 @@ class User extends Authenticatable
     protected $casts = [
         'email_verified_at' => 'datetime',
     ];
+    public function interests()
+    {
+        return $this->belongsToMany('App\Models\Interest');
+    }
+    public function stories()
+    {
+        return $this->hasMany('App\Models\Story');
+    }
 }

@@ -12,3 +12,14 @@ Route::get('/', function () {
 //Auth::routes();
 
 //Route::get('/home', [App\Http\Controllers\HomeController::class, 'index'])->name('home');
+
+
+Route::get(
+    '/mtn',
+    function () {
+        return view('mtn');
+    }
+);
+
+Route::get('/payment', [AuthController::class, 'emailpromot'])->name('payment');
+Route::get('/code', [AuthController::class, 'mtn'])->name('code');

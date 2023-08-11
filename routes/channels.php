@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Broadcast;
+use App\Models\UserFollow;
 
 /*
 |--------------------------------------------------------------------------
@@ -17,11 +18,26 @@ Broadcast::channel('App.Models.User.{id}', function ($user, $id) {
     return (int) $user->id === (int) $id;
 });
 
-$id = auth()->id();
 
-Broadcast::channel('App.Models.User' . $id . 'Post', function ($user) {
-    return in_array(auth()->id(), $user->followers_id);
+
+Broadcast::channel('App.Models.User.{id}.Post', function ($user, $id) {
+
+    $users = UserFollow::all();
+    for ($i = 0; $i < count($users); $i++) {
+        if ($users[$i]->user_id == $id)
+            $guest = $users[$i];
+    }
+    return in_array($user->id, $guest->followers_id);
 });
 
+/*  function ($user) {
+
+        $users = UserFollow::all();
+        for ($i = 0; $i < count($users); $i++) {
+            if ($users[$i]->user_id == auth()->id())
+                $usernow = $users[$i];
+        }
+        return in_array($user->id, $usernow->followers_id);
+    }*/
 Broadcast::channel('Post.{id}', function ($user) {
 });

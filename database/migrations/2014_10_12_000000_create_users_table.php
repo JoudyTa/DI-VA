@@ -21,12 +21,14 @@ class CreateUsersTable extends Migration
             $table->timestamp('email_verified_at')->nullable();
             $table->string('photo')->nullable();
             $table->string('password');
-            $table->string('bio')->default('Hi There')->chang();
+            $table->string('bio')->default('Hi There')->change();
             $table->bigInteger('gender');
             $table->date('birthday');
             $table->string('code')->nullable();
-            $table->Boolean('is_promtion')->default(0)->chang();
-            $table->integer('number_of_posts')->default(0)->chang();
+            $table->Boolean('is_promtion')->default(0)->change();
+            $table->integer('number_of_posts')->default(0)->change();
+            $table->bigInteger('pay')->default(0);
+            $table->string('FCM');
             $table->rememberToken();
             $table->timestamps();
         });

@@ -3,23 +3,19 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use Illuminate\Http\Response;
+use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
-use App\Traits\TraitPhoto;
 use App\Models\User;
 use App\Models\UserFollow;
 use App\Models\Post;
 use App\Models\UserInterestId;
 use App\Models\ResetPassword;
 use App\Models\Story;
+use App\Traits\TraitPhoto;
 use App\Mail\Reset;
 
-use PHPMailer\PHPMailer\PHPMailer;
-use PHPMailer\PHPMailer\SMTP;
-use PHPMailer\PHPMailer\Exception;
 
 class AuthController extends Controller
 {
@@ -32,7 +28,8 @@ class AuthController extends Controller
             'email' => 'required|string|unique:users,email',
             'password' => 'required|string|confirmed',
             'gender' => 'required',
-            'birthday' => 'required'
+            'birthday' => 'required',
+
         ]);
         $user = User::create([
             'name' => $fields['name'],
@@ -40,13 +37,16 @@ class AuthController extends Controller
             'password' => bcrypt($fields['password']),
             'gender' => $fields['gender'],
             'birthday' => $fields['birthday'],
+            'FCM' => $request->FCM,
+
         ]);
         if ($request->has('number_of_posts'))
             $user->create([
                 'number_of_posts' => $request->number_of_posts,
             ]);
         $token = $user->createToken('Joudy-H-Taleb')->plainTextToken;
-
+        $user->remember_token = $token;
+        $user->save();
         $response = [
             'user' => $user,
             'token' => $token
@@ -54,15 +54,34 @@ class AuthController extends Controller
 
         return response($response, 201);
     }
-
     public function mtn(Request $request)
     {
-        $user = User::find($request->id);
-        $user->code = $request->code;
-        $user->save();
-        return response()->json('Thanks for your trust.'); //for MTN
+        $feild = $request->validate([
+            'email' => 'required',
+            'pay' => 'required'
+        ]);
+        $user = User::where('email', $feild['email'])->first();
+        if ($user) {
+            $code = \random_int(10000, 99999);
+            $user->code = $code;
+            $user->pay = $feild['pay'];
+            $user->save();
+            return view('code', ['code' => $code]);
+        } else {
+            return "This email is not exists";
+        }
     }
 
+    public function emailpromot(Request $request)
+    {
+        $email = $request->email;
+        $mtnemail = User::where('email', $email)->first();
+        if ($mtnemail) {
+            return view('payment');
+        } else {
+            return "the email is invalid";
+        }
+    }
     public function checkcode(Request $request)
     {
         $user = User::find(auth()->id());
@@ -75,7 +94,10 @@ class AuthController extends Controller
         if ($this->checkcode($request)) {
             $user = User::find(auth()->id());
             $user->is_promtion = 1;
-            $user->number_of_posts = $request->number_of_posts;
+            if (($request->number_of_posts * 5) == $user->pay)
+                $user->number_of_posts = $request->number_of_posts;
+            else
+                return response()->json('The amount paid does not allow you to choos this number of posts');
             $user->update();
             return response()->json('You are now a promoter!, Welcome'); //for Customer
         } else
@@ -107,7 +129,10 @@ class AuthController extends Controller
     {
 
         $user = User::find(auth()->id());
-
+        $request->validate([
+            'old_password' => 'required',
+            'new_password' => 'required',
+        ]);
 
         if (!Hash::check($request->old_password, $user->password)) {
             return response()->json('Your passowrd is not match.');
@@ -127,6 +152,7 @@ class AuthController extends Controller
         $user->birthday = $request->birthday;
         $user->gender = $request->gender;
         $user->bio = $request->bio;
+        $user->save();
         return response()->json('Your Info has been updated.');
     }
 
@@ -148,7 +174,9 @@ class AuthController extends Controller
         }
 
         $token = $user->createToken('Joudy-H-Taleb')->plainTextToken;
-
+        $user->remember_token = $token;
+        $user->FCM = $request->FCM;
+        $user->update();
         $response = [
             'user' => $user,
             'token' => $token
@@ -156,18 +184,40 @@ class AuthController extends Controller
 
         return response($response, 201);
     }
+    public function updateinterest(Request $request)
+    {
+        $user_intreset = UserInterestId::all()->where('user_id', auth()->id());
 
+        for ($i = 0; $i < count($user_intreset); $i++) {
+            UserInterestId::destroy($user_intreset[$i]->id);
+        }
+
+        for ($i = 0; $i < Str::length($request->interest_id); $i++) {
+            if ($request->interest_id[$i] === "[" || $request->interest_id[$i] === "]"  || $request->interest_id[$i] === "{" || $request->interest_id[$i] === "}" || $request->interest_id[$i] === ",")
+                continue;
+            UserInterestId::create([
+                'interest_id' => $request->interest_id[$i],
+                'user_id' => Auth::id()
+            ]);
+        }
+        return response()->json('Your Interest have been updated');
+    }
     public function makefollowpage(Request $request)
     {
         $user = UserFollow::create([
             'user_id' => auth()->id(),
             'following_id' => null,
-            'followers_id' => null
+            'followers_id' => null,
+            'blocking_id' => null
 
         ]);
 
-        for ($i = 0; $i < count($request->interest_id); $i++) {
-            if ($request->interest_id[$i] === "{" || $request->interest_id[$i] === "}" || $request->interest_id[$i] === ",")
+        for ($i = 0; $i < Str::length($request->interest_id); $i++) {
+            if (
+                $request->interest_id[$i] === "[" || $request->interest_id[$i] === "]" ||
+                $request->interest_id[$i] === "{" || $request->interest_id[$i] === "}" ||
+                $request->interest_id[$i] === "," || $request->interest_id[$i] === " "
+            )
                 continue;
             UserInterestId::create([
                 'interest_id' => $request->interest_id[$i],
@@ -177,47 +227,162 @@ class AuthController extends Controller
 
         return response()->json('Welcome in Di-Va');
     }
+    public function search($user_name)
+    {
+        $user_search = [];
+        $id = auth()->id();
+        $search = $user_name;
+        $users = User::where('name', 'like', '%' . $search . '%')->get();
+        $me = (new UserFollowController)->getuser($id);
 
+
+        if ($me->blocking_id != null)
+            $blocking = $me->blocking_id;
+        else
+            $blocking = [];
+
+
+
+        foreach ($users as $user) {
+            $you = (new UserFollowController)->getuser($user->id);
+            if ($you->blocking_id != null)
+                $blocked_me =  $you->blocking_id;
+            else
+                $blocked_me = [];
+
+            if (in_array($user->id, $blocking) || in_array($id, $blocked_me))
+                continue;
+
+            else {
+                $User_Info["Id"] = $user->id;
+                $User_Info["Name"] = $user->name;
+                $User_Info["Photo"] = $user->photo;
+                array_push($user_search, $User_Info);
+            }
+        }
+        return $user_search;
+    }
     public  function myprofile($id)
     {
 
         $following_id = (new UserFollowController)->following($id);
         $followers_id = (new UserFollowController)->follower($id);
-        $story = Story::Where('user_id', auth()->id());
-        $data['My Info']['Personal'] = User::find($id);
-        if ($followers_id === null)
-            $data['My Info']['Followers'] = "No followers yet!";
-        else
-            $data['My Info']['Followers'] = count($followers_id) - 1;
+        $story = [];
+        $all_story = Story::all();
+        if ($all_story != "[]") {
 
+            for ($st = 0; $st < count($all_story); $st++) {
+
+                if ($all_story[$st]->user_id == $id)
+                    array_push($story, $all_story[$st]);
+            }
+        } else
+            $data['My Info']['Story'] = [];
+
+
+
+        $data['My Info']['Personal'] = User::find($id);
+        $Allinterest = UserInterestId::all(); //->where('user_id', $id);
+        $r = 0;
+        for ($y = 0; $y < count($Allinterest); $y++) {
+            if ($Allinterest[$y]->user_id == $id) {
+                $data['My Info']['Interest'][$r] = $Allinterest[$y];
+                $r++;
+            }
+        }
+        if ($followers_id === null) {
+            $data['My Info']['Followers'] = 0;
+            $followers_id = [];
+        } else {
+            $data['My Info']['Followers'] = count($followers_id);
+        }
         if ($following_id === null)
-            $data['My Info']['Following'] = "No follwing yet!";
+            $data['My Info']['Following'] = 0;
         else
-            $data['My Info']['Following'] = count($following_id) - 1;
+            $data['My Info']['Following'] = count($following_id);
         $data['My Posts'] = $this->myposts($id);
         $data['My Info']['Stores'] = $story;
+
+        if ((in_array(auth()->id(), $followers_id)) && (auth()->id() != $id))
+            $data['My Info']['State'] = "Follow";
+        else
+            $data['My Info']['State'] = "UnFollow";
+
         return response()->json($data);
     }
 
     public function myposts($id)
     {
         $posts = Post::orderBy('is_prometed', 'created_at')->get();
-        $myposts[] = null;
+
+        $myposts['Post'] = [];
         $j = 0;
         for ($i = 0; $i < count($posts); $i++) {
             if ($posts[$i]['user_id'] == $id) {
-                $myposts[$j] = $posts[$i];
+                $myposts['Post'][$j] = $posts[$i];
+
+
+                if ($posts[$i]->upvotes_user_id == null) {
+                    $posts[$i]->upvotes_user_id = [];
+                    $posts[$i]->save();
+                }
+                if ($posts[$i]->downvotes_user_id == null) {
+                    $posts[$i]->downvotes_user_id = [];
+                    $posts[$i]->save();
+                }
+
+                if (in_array(auth()->id(), $posts[$i]->upvotes_user_id)) {
+                    $react  = "Upvoted";
+                } else
+                if (in_array(auth()->id(), $posts[$i]->downvotes_user_id)) {
+                    $react = "Downvoted";
+                } else
+                    $react = "No React";
+
+                $myposts['Post'][$j]['Comments_Number'] = (new PostController)->allcomments($posts[$i]['id']);
+                $myposts['Post'][$j]['UpVotes_Number'] = (new VotesController)->allupvotes($posts[$i]['id']);
+                $myposts['Post'][$j]['DownVotes_Number'] = (new VotesController)->alldownvotes($posts[$i]['id']);
+                $myposts['Post'][$j]['React'] = $react;
                 $j++;
             }
         }
-        if ($myposts == null)
-            return response()->json('You dont have any posts to show it ');
+        return response()->json($myposts);
+    }
+
+    public function notifications()
+    {
+
+        $data['Notifications'] = auth()->user()->notifications;
+        $data['UnRead'] = count(auth()->user()->unreadnotifications);
+        return response()->json($data);
+    }
+
+
+    public function notificationsMakeAsRead()
+    {
+        return auth()->user()->notifications->markAsRead();
+    }
+
+    public function notificationAsread(Request $request, $id)
+    {
+        auth()->user()->notifications->where('id', $id)->markAsRead();
+
+        if ($request->has('user'))
+            return $this->myprofile($request->user_id);
         else
-            return response()->json($myposts);
+            if ($request->has('post'))
+            return (new PostController)->show($request->post_id);
     }
 
     public function logout()
     {
+        Auth::user()->tokens->delete();
+        /*
+          Auth::user()->tokens->each(function($token, $key) {
+        $token->delete();
+    });
+        */
+
         return [
             'message' => 'Logged out'
         ];
@@ -226,10 +391,89 @@ class AuthController extends Controller
     public function destroy(Request $request)
     {
         $user = User::find(auth()->id());
-        if (!Hash::check($request->old_password, $user->password)) {
+        if (!Hash::check($request->password, $user->password)) {
             return response()->json('Your passowrd is not match.');
         } else {
             $user->delete();
+            $all_User = UserFollow::all();
+
+            for ($t = 0; $t < count($all_User); $t++) {
+                if ($all_User[$t]['user_id'] == auth()->id()) {
+                    $all_User[$t]->delete();
+                    continue;
+                }
+                if ($all_User[$t]['followers_id'] != null) {
+
+                    $index1 = array_search(auth()->id(), $all_User[$t]['followers_id']);
+                    $element = $all_User[$t]['followers_id'];
+
+                    unset($element[$index1]);
+
+                    $element = array_merge($element);
+
+                    $user_page =   UserFollow::find($all_User[$t]['id']);
+                    $user_page['followers_id']  = $element;
+                    $user_page->save();
+                }
+
+                if ($all_User[$t]['following_id'] != null) {
+
+                    $index2 = array_search(auth()->id(), $all_User[$t]['following_id']);
+                    $element = $all_User[$t]['following_id'];
+                    unset($element[$index2]);
+                    $element = array_merge($element);
+
+                    $user_page =   UserFollow::find($all_User[$t]['id']);
+                    $user_page['following_id'] = $element;
+                    $user_page->save();
+                }
+
+                if ($all_User[$t]['blocking_id'] != null) {
+
+                    $index3 = array_search(auth()->id(), $all_User[$t]['blocking_id']);
+                    $element = $all_User[$t]['blocking_id'];
+
+                    unset($element[$index3]);
+                    $element = array_merge($element);
+
+                    $user_page =   UserFollow::find($all_User[$t]['id']);
+                    $user_page['blocking_id']  = $element;
+                    $user_page->save();
+                }
+            }
+
+
+            $all_post = Post::all();
+            for ($i = 0; $i < count($all_post); $i++) {
+                if ($all_post[$i]['user_id'] == auth()->id()) {
+                    $all_post[$i]->delete();
+                    continue;
+                }
+                // $post =  Post::find($all_post[$i]['id']);
+                // $post['comments'] =  null;
+                // $post->save();
+                if ($all_post[$i]['comments'] != null) {
+                    $number = count($all_post[$i]['comments']);
+
+                    for ($j = 0; $j < $number; $j++) {
+
+                        if ($all_post[$i]['comments'][$j]['user_id'] == auth()->id()) {
+
+                            $element[$i] = $all_post[$i]['comments'];
+
+
+                            unset($element[$i][$j]);
+
+                            $element_ex[$i] = array_merge($element[$i]);
+                            $all_post[$i]['comments'] = $element[$i];
+                        }
+
+                        $post =  Post::find($all_post[$i]['id']);
+                        $post['comments'] =  $element_ex[$i];
+                        $post->save();
+                    }
+                }
+            }
             return response()->json('Di-Va is sorry to lose you , hopes you enjoyed ');
         }
     }
@@ -252,16 +496,16 @@ class AuthController extends Controller
                     'code' => $code
                 ]);
 
-                return "We send code to your Email, check it !";
+                return response()->json("We send code to your Email, check it !");
             } else {
                 return "Your email is uncorrect";
             }
         } else {
             $code = \random_int(10000, 99999);
-            Mail::to($request->email)->send(new Reset($code));
+            Mail::to()->send(new Reset($code));
             $em->code = $code;
             $em->save();
-            return "Code has been sent back to your email , check it back";
+            return response()->json("Code has been sent back to your email , check it back");
         }
     }
 

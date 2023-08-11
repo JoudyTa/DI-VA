@@ -48,17 +48,26 @@ class PostEvent implements ShouldBroadcast
     public function broadcastOn()
     {
         $id = auth()->id();
-        return new Channel('App.Models.User' . $id . 'Post'); //, $this->post->user_id);
+        return new PrivateChannel('App.Models.User.' . $id . '.Post'); //, $this->post->user_id);
     }
     public function broadcastWith()
     {
         return [
-            'photo' => $this->post->photo,
             'user_id' => $this->post->user_id,
+            'user_name' => auth()->user()->name,
+            'user_photo' => auth()->user()->photo,
+            'post_id' => $this->post->id,
+            'photo' => $this->post->photo,
             'created_at' => $this->post->created_at->toFormattedDateString(),
             'interest_id' => $this->post->interest_id,
             'content' => $this->post->content,
             'is_prometed' => $this->post->is_prometed
         ];
     }
+
+    /*   public function broadcastAs()
+    {
+        $id = auth()->id();
+        return 'App.Models.User.' . $id . '.Post';
+    } */
 }
