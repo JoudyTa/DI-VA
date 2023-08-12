@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Demo</title>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.138.0/build/three.module.js",
+                "OrbitControls": "https://unpkg.com/three@0.138.0/examples/jsm/controls/OrbitControls.js"
+            }
+        }
+    </script>
+    <style>
+      input{
+        border: 20px solid rgb(134, 122, 129);
+      }
+    </style>
+  </head>
+  <body>
+    <script src="https://rawcdn.githack.com/mrdoob/three.js/d9f87fb1a2c5db1ea0e2feda9bd42b39b5bedc41/build/three.min.js"></script>
+    <script src="https://unpkg.com/three@0.85.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://unpkg.com/three@0.87.1/examples/js/loaders/GLTFLoader.js"></script>
+
+    <input id="S" name="S">
+    <label for="S">surface area</label><br>
+
+    <input id="mf" name="mf">
+    <label for="mf">mass of fule</label><br>
+
+    <input id="mr" name="mr">
+    <label for="mr">mass of Rocket</label><br>
+
+    <input id="ve" name="ve">
+    <label for="ve">fuel exit velocity</label><br>
+
+    <input id="lom" name="lom">
+    <label for="lom">lack of fule mass per second</label><br>
+
+    <h3 id="h3"></h3>
+    <button>start</button>
+    <script src="project.js" type="module">
+    </script>
+  </body>
+</html>
